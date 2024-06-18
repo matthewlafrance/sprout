@@ -32,7 +32,10 @@ impl Iterator for TokenStream<'_> {
             .or_else(|| self.read_rest())
             .map(Ok)
             .or_else(|| self.read_string_literal())
-            .or_else(|| self.peek().map(|c| Err(anyhow!("invalid character: {c}"))))
+            .or_else(|| {
+                self.consume_char().map(|c| Err(anyhow!("invalid character: {c}")))
+            })
+            
     }
 }
 
@@ -46,9 +49,11 @@ impl<'a> TokenStream<'a> {
     fn read_int_literal(&mut self) -> Option<Token> {
         self.consume_whitespace();
         let mut int_token = self.peek()?.to_digit(10)?;
-        while let Some(int) = self.consume_char().and_then(|c| c.to_digit(10)) { 
+        self.consume_char();
+        while let Some(int) = self.peek().and_then(|c| c.to_digit(10)) { 
             if self.peek().is_none() {break;}
             int_token = int_token*10 + int;
+            self.consume_char();
         }
         Some(Token::Literal(Literal::Int(int_token)))
     }
@@ -71,7 +76,8 @@ impl<'a> TokenStream<'a> {
     fn consume_string_literal(&mut self) -> Option<anyhow::Result<Token>> { 
         let mut string_literal = String::new();
         loop {
-            match self.consume_char() {
+            self.consume_char();
+            match self.peek() {
                 Some(c) => {
                     if c != '"' {     
                         string_literal.push(c);
@@ -82,11 +88,6 @@ impl<'a> TokenStream<'a> {
                 None => {return Some(Err(anyhow!("no closing delimiter on string literal")));}
             }
         }
-        /*
-        while self.consume_char()? != '"' {
-            string_literal.push(self.peek()?);
-        }
-        */
         self.consume_char();
         Some(Ok(Token::Literal(Literal::Str(string_literal))))
     }
@@ -101,9 +102,11 @@ impl<'a> TokenStream<'a> {
 
     fn consume_rest(&mut self) -> Option<Token> {
         let mut literal = String::from(self.peek()?);
-        while let Some(c) = self.consume_char() {
+        self.consume_char();
+        while let Some(c) = self.peek() {
             if c.is_alphanumeric() || c == '_' { 
                 literal.push(c);
+                self.consume_char();
             } else {
                 break;
             }
@@ -143,8 +146,9 @@ impl<'a> TokenStream<'a> {
     }
 
     fn consume_char(&mut self) -> Option<char> {
+        let prev = self.current;
         self.current = self.src.next();
-        self.current
+        prev
     }
 }
 
@@ -198,6 +202,13 @@ mod tests {
     fn test_err_string_literal() {
         let result = "no closing delimiter on string literal".to_string();
         let test: Vec<String> = tokenize("\"hello world").map(|f| f.unwrap_err().to_string()).collect();
+        assert_eq!(test[0], result);
+    }
+
+    #[test]
+    fn test_invalid_character() {        
+        let result = "invalid character: [".to_string();
+        let test: Vec<String> = tokenize("[").map(|f| f.unwrap_err().to_string()).collect();
         assert_eq!(test[0], result);
     }
     
