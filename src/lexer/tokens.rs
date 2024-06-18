@@ -1,5 +1,6 @@
 use soccer::TryFrom;
 
+#[derive(PartialEq, Debug)]
 pub enum Token {
     Ident(String),
     Keyword(Keyword),
@@ -7,6 +8,7 @@ pub enum Token {
     Punctuation(Punctuation),
 }
 
+#[derive(PartialEq, Debug)]
 pub enum Keyword {
     Let,
     Mut,
@@ -19,13 +21,14 @@ pub enum Keyword {
     Else,
 }
 
+#[derive(PartialEq, Debug)]
 pub enum Literal {
     Int(u32),
     Str(String),
     Bool(bool),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, TryFrom)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, TryFrom)]
 #[const_ty(char)]
 pub enum Punctuation {
     #[const_val('+')]
