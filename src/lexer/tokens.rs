@@ -19,6 +19,8 @@ pub enum Keyword {
     While,
     If,
     Else,
+    Break,
+    Continue,
 }
 
 #[derive(PartialEq, Debug)]
@@ -49,6 +51,8 @@ pub enum Punctuation {
     Semi,
     #[const_val(':')]
     Colon,
+    #[const_val(',')]
+    Comma,
     #[const_val('{')]
     LeftBrace,
     #[const_val('}')]

@@ -121,6 +121,8 @@ impl<'a> TokenStream<'a> {
             "while" => Some(Token::Keyword(Keyword::Repeat)),
             "if" => Some(Token::Keyword(Keyword::If)),
             "else" => Some(Token::Keyword(Keyword::Else)),
+            "break" => Some(Token::Keyword(Keyword::Break)),
+            "continue" => Some(Token::Keyword(Keyword::Break)),
             "true" => Some(Token::Literal(Literal::Bool(true))),
             "false" => Some(Token::Literal(Literal::Bool(false))),
             ident => Some(Token::Ident(ident.to_string())),
