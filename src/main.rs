@@ -8,5 +8,5 @@ fn main() {
 
 #[derive(Parser)]
 struct Cli {
-    src: String
+    src: String,
 }
