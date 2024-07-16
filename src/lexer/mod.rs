@@ -1,22 +1,23 @@
-mod tokens;
+pub mod tokens;
 
-use anyhow::{anyhow, Result};
-use tokens::{Token, Literal, Punctuation, Keyword};
 use std::str::Chars;
 
-pub fn tokenize(src: &str) -> impl Iterator<Item = anyhow::Result<Token>> + '_ {
+use anyhow::{anyhow, Result};
+use tokens::{Keyword, Literal, Punctuation, Token};
+
+pub fn tokenize(src: &str) -> TokenStream<'_> {
     //parse through src by character
     //filter based on possible tokens
     //when i reach a new token, check first character and match with possibilities
-        //if digit, int
-        //if puncuation, punctuation
-        //if ", string
-        //if letter, then get entire token and decide between bool, keyword, ident
+    //if digit, int
+    //if puncuation, punctuation
+    //if ", string
+    //if letter, then get entire token and decide between bool, keyword, ident
     //parse rest of token and store accordingly
     TokenStream::new(src)
 }
 
-struct TokenStream<'a> {
+pub struct TokenStream<'a> {
     // add fields
     src: Chars<'a>,
     current: Option<char>,
@@ -26,16 +27,15 @@ impl Iterator for TokenStream<'_> {
     type Item = anyhow::Result<Token>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self
-            .read_int_literal()
+        self.read_int_literal()
             .or_else(|| self.read_punctuation())
             .or_else(|| self.read_rest())
             .map(Ok)
             .or_else(|| self.read_string_literal())
             .or_else(|| {
-                self.consume_char().map(|c| Err(anyhow!("invalid character: {c}")))
+                self.consume_char()
+                    .map(|c| Err(anyhow!("invalid character: {c}")))
             })
-            
     }
 }
 
@@ -43,16 +43,18 @@ impl<'a> TokenStream<'a> {
     fn new(src: &'a str) -> Self {
         let mut src = src.chars();
         let current = src.next();
-        TokenStream {src, current} 
+        TokenStream { src, current }
     }
 
     fn read_int_literal(&mut self) -> Option<Token> {
         self.consume_whitespace();
         let mut int_token = self.peek()?.to_digit(10)?;
         self.consume_char();
-        while let Some(int) = self.peek().and_then(|c| c.to_digit(10)) { 
-            if self.peek().is_none() {break;}
-            int_token = int_token*10 + int;
+        while let Some(int) = self.peek().and_then(|c| c.to_digit(10)) {
+            if self.peek().is_none() {
+                break;
+            }
+            int_token = int_token * 10 + int;
             self.consume_char();
         }
         Some(Token::Literal(Literal::Int(int_token)))
@@ -62,7 +64,8 @@ impl<'a> TokenStream<'a> {
         self.consume_whitespace();
         Punctuation::try_from(self.peek()?).ok().map(|p| {
             self.consume_char();
-            Token::Punctuation(p)})
+            Token::Punctuation(p)
+        })
     }
 
     fn read_string_literal(&mut self) -> Option<anyhow::Result<Token>> {
@@ -73,19 +76,21 @@ impl<'a> TokenStream<'a> {
         }
     }
 
-    fn consume_string_literal(&mut self) -> Option<anyhow::Result<Token>> { 
+    fn consume_string_literal(&mut self) -> Option<anyhow::Result<Token>> {
         let mut string_literal = String::new();
         loop {
             self.consume_char();
             match self.peek() {
                 Some(c) => {
-                    if c != '"' {     
+                    if c != '"' {
                         string_literal.push(c);
                     } else {
                         break;
                     }
                 },
-                None => {return Some(Err(anyhow!("no closing delimiter on string literal")));}
+                None => {
+                    return Some(Err(anyhow!("no closing delimiter on string literal")));
+                },
             }
         }
         self.consume_char();
@@ -104,7 +109,7 @@ impl<'a> TokenStream<'a> {
         let mut literal = String::from(self.peek()?);
         self.consume_char();
         while let Some(c) = self.peek() {
-            if c.is_alphanumeric() || c == '_' { 
+            if c.is_alphanumeric() || c == '_' {
                 literal.push(c);
                 self.consume_char();
             } else {
@@ -114,15 +119,14 @@ impl<'a> TokenStream<'a> {
         match literal.as_str() {
             "let" => Some(Token::Keyword(Keyword::Let)),
             "mut" => Some(Token::Keyword(Keyword::Mut)),
-            "print" => Some(Token::Keyword(Keyword::Print)),
-            "read" => Some(Token::Keyword(Keyword::Read)),
             "func" => Some(Token::Keyword(Keyword::Func)),
             "repeat" => Some(Token::Keyword(Keyword::Repeat)),
-            "while" => Some(Token::Keyword(Keyword::Repeat)),
+            "while" => Some(Token::Keyword(Keyword::While)),
             "if" => Some(Token::Keyword(Keyword::If)),
             "else" => Some(Token::Keyword(Keyword::Else)),
             "break" => Some(Token::Keyword(Keyword::Break)),
-            "continue" => Some(Token::Keyword(Keyword::Break)),
+            "continue" => Some(Token::Keyword(Keyword::Continue)),
+            "return" => Some(Token::Keyword(Keyword::Return)),
             "true" => Some(Token::Literal(Literal::Bool(true))),
             "false" => Some(Token::Literal(Literal::Bool(false))),
             ident => Some(Token::Ident(ident.to_string())),
@@ -132,13 +136,17 @@ impl<'a> TokenStream<'a> {
     fn consume_whitespace(&mut self) {
         loop {
             match self.peek() {
-                Some(c) => {
-                    match c.is_whitespace() {
-                        true => {self.consume_char();}
-                        false => {break;}
-                    }
+                Some(c) => match c.is_whitespace() {
+                    true => {
+                        self.consume_char();
+                    },
+                    false => {
+                        break;
+                    },
                 },
-                None => {break;},
+                None => {
+                    break;
+                },
             }
         }
     }
@@ -154,7 +162,6 @@ impl<'a> TokenStream<'a> {
     }
 }
 
-
 mod tests {
     use crate::lexer::*;
 
@@ -166,21 +173,21 @@ mod tests {
     }
 
     #[test]
-    fn test_ident() { 
+    fn test_ident() {
         let result = Token::Ident("Test".to_string());
         let test: Vec<Token> = tokenize("Test").map(|f| f.unwrap()).collect();
         assert_eq!(test[0], result);
     }
 
     #[test]
-    fn test_keyword() { 
+    fn test_keyword() {
         let result = Token::Keyword(Keyword::Mut);
         let test: Vec<Token> = tokenize("mut").map(|f| f.unwrap()).collect();
         assert_eq!(test[0], result);
     }
 
     #[test]
-    fn test_punctuation() {        
+    fn test_punctuation() {
         let result = Token::Punctuation(Punctuation::Equals);
         let test: Vec<Token> = tokenize("=").map(|f| f.unwrap()).collect();
         assert_eq!(test[0], result);
@@ -192,9 +199,9 @@ mod tests {
         let test: Vec<Token> = tokenize("\"Hello World\"").map(|f| f.unwrap()).collect();
         assert_eq!(test[0], result);
     }
-    
+
     #[test]
-    fn bool_literal_test() { 
+    fn bool_literal_test() {
         let result = Token::Literal(Literal::Bool(true));
         let test: Vec<Token> = tokenize("true").map(|f| f.unwrap()).collect();
         assert_eq!(test[0], result);
@@ -203,24 +210,31 @@ mod tests {
     #[test]
     fn test_err_string_literal() {
         let result = "no closing delimiter on string literal".to_string();
-        let test: Vec<String> = tokenize("\"hello world").map(|f| f.unwrap_err().to_string()).collect();
+        let test: Vec<String> = tokenize("\"hello world")
+            .map(|f| f.unwrap_err().to_string())
+            .collect();
         assert_eq!(test[0], result);
     }
 
     #[test]
-    fn test_invalid_character() {        
+    fn test_invalid_character() {
         let result = "invalid character: [".to_string();
         let test: Vec<String> = tokenize("[").map(|f| f.unwrap_err().to_string()).collect();
         assert_eq!(test[0], result);
     }
-    
+
     #[test]
     fn test_all() {
-        let test: Vec<Token> = tokenize("mut test = \"hello world\"; 123= true").map(|f| f.unwrap()).collect();
+        let test: Vec<Token> = tokenize("mut test = \"hello world\"; 123= true")
+            .map(|f| f.unwrap())
+            .collect();
         assert_eq!(test[0], Token::Keyword(Keyword::Mut));
         assert_eq!(test[1], Token::Ident("test".to_string()));
         assert_eq!(test[2], Token::Punctuation(Punctuation::Equals));
-        assert_eq!(test[3], Token::Literal(Literal::Str("hello world".to_string())));
+        assert_eq!(
+            test[3],
+            Token::Literal(Literal::Str("hello world".to_string()))
+        );
         assert_eq!(test[4], Token::Punctuation(Punctuation::Semi));
         assert_eq!(test[5], Token::Literal(Literal::Int(123)));
         assert_eq!(test[6], Token::Punctuation(Punctuation::Equals));
