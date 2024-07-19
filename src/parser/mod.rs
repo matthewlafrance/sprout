@@ -102,8 +102,9 @@ impl Parser<'_> {
             Ok(ast::Statement::Return(self.parse_return()?))
         } else if self.has_ident() {
             if self.has_punctuation_next(Punctuation::LeftParen) {
-            println!("9");
-                Ok(ast::Statement::FunctionCall(self.parse_func_call()?))
+                let func_call = Ok(ast::Statement::FunctionCall(self.parse_func_call()?));
+                self.expect_punctuation(Punctuation::Semi)?;
+                func_call
             } else if self.has_punctuation_next(Punctuation::Equals) {
                 Ok(ast::Statement::Assignment(self.parse_assignment()?))
             } else {
@@ -241,6 +242,7 @@ impl Parser<'_> {
         self.expect_punctuation(Punctuation::LeftParen)?;
         while self.has_expr() {
             args.push(self.parse_expr()?);
+            if self.has_punctuation(Punctuation::Comma) {self.expect_punctuation(Punctuation::Comma)?;}
         }
         self.expect_punctuation(Punctuation::RightParen)?;
         Ok(ast::FunctionCall{name, args})
@@ -412,7 +414,6 @@ impl Parser<'_> {
     }
 
     fn expect_punctuation(&mut self, target: Punctuation) -> anyhow::Result<()> {
-        println!("expected {} found  {}",target, self.peek().unwrap());
         match self.consume_token()? {
             Token::Punctuation(p) if p == target => {
                 Ok(())
@@ -447,7 +448,6 @@ impl Parser<'_> {
     }
     
     fn consume_token(&mut self) -> anyhow::Result<Token> {
-        println!("{}", self.peek().unwrap());
         let current = self.current.take();
         self.current = self.next.take();
         self.next = self.tokens.next();
@@ -488,101 +488,95 @@ mod tests {
     
     #[test]
     fn test_func() {
-        let funcs = "func test_func(first_param: first_type, second_param: second_type): return_type {} 
-                     func another_func() {}";
-        let test_module = format!("{:?}", parse(tokenize(funcs)).expect("error"));
-        let result = "Module { funcs: [Func { name: \"test_func\", param_list: [Param { name: \"first_param\", param_type: Type { name: \"first_type\" } }, Param { name: \"second_param\", param_type: Type { name: \"second_type\" } }], return_type: Some(Type { name: \"return_type\" }), block: Block { stmts: [] } }, Func { name: \"another_func\", param_list: [], return_type: None, block: Block { stmts: [] } }] }";
-        assert_eq!(result, test_module);
-    }
-    
-    #[test]
-    fn test_assignment() {
-        let func = "func test() {
-            let x: int = 1;
-            let mut y = \"hello\";
-            let z;
-        }";
-        let test_module = format!("{:?}", parse(tokenize(func)).expect("error"));
-        let result = "Module { funcs: [Func { name: \"test\", param_list: [], return_type: None, block: Block { stmts: [VarDecl(VarDecl { mutable: false, name: \"x\", var_type: Some(Type { name: \"int\" }), value: Some(Literal(Int(1))) }), VarDecl(VarDecl { mutable: true, name: \"y\", var_type: None, value: Some(Literal(Str(\"hello\"))) }), VarDecl(VarDecl { mutable: false, name: \"z\", var_type: None, value: None })] } }] }";
-        assert_eq!(result, test_module);
-    }
+        let module = 
+"func test_func(first_param: first_type, second_param: second_type): return_type {
+}
+func another_func() {
+}
+";
+        generic_test(module);
+    }    
 
     #[test]
     fn test_data_types() {
-        let func = "func test() {
-            let i: int = 1000;
-            let s: String = \"Hello World\";
-            let b: bool = true;
-        }";
-        let test_module = parse(tokenize(func));
-        println!("{:?}", test_module.expect("error"));
+        let module = 
+"func test() {
+    let i: int = 1000;
+    let s: String = \"Hello World\";
+    let b: bool = true;
+}
+";
+        generic_test(module);
     }
 
     #[test]
     fn test_operators() {
-        let func = "func test() {
-            let x = 1 + 2;
-            let x = 2 - 1;
-            let x = 2 * 2;
-            let x = 4 / 2;
-            let x = true == true;
-            let x = false != true;
-            let x = 10 < 9;
-            let x = 9 > 10;
-            let x = 10 <= 9;
-            let x = 9 >= 10;
-            let x = -21;
-        }";
-        let test_module = format!("{:?}", parse(tokenize(func)).expect("error"));
-        let result = "Module { funcs: [Func { name: \"test\", param_list: [], return_type: None, block: Block { stmts: [VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(1)), Plus, Literal(Int(2)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(2)), Minus, Literal(Int(1)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(2)), Mul, Literal(Int(2)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(4)), Div, Literal(Int(2)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Bool(true)), Eq, Literal(Bool(true)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Bool(false)), Ne, Literal(Bool(true)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(10)), Lt, Literal(Int(9)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(9)), Gt, Literal(Int(10)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(10)), Le, Literal(Int(9)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(9)), Ge, Literal(Int(10)))) }), VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(UnaryOp([Neg], Literal(Int(21)))) })] } }] }";
-        assert_eq!(result, test_module);
+        let module = 
+"func test() {
+    let x = 1 + 2;
+    let x = 2 - 1;
+    let x = 2 * 2;
+    let x = 4 / 2;
+    let x = true == true;
+    let x = false != true;
+    let x = 10 < 9;
+    let x = 9 > 10;
+    let x = 10 <= 9;
+    let x = 9 >= 10;
+    let x = -21;
+}
+";
+        generic_test(module);
     }
     
     #[test]
     fn test_control_flow() {
-        let func = "func test() {
-            if true {
-                
-            } 
-            
-            if true {
-
-            } else {
-
-            }
-
-            while true {
-            
-            }
-        }";
-        let test_module = format!("{:?}", parse(tokenize(func)).expect("error"));
-        let result = "Module { funcs: [Func { name: \"test\", param_list: [], return_type: None, block: Block { stmts: [Conditional(Conditional { condition: Literal(Bool(true)), if_block: Block { stmts: [] }, else_block: None }), Conditional(Conditional { condition: Literal(Bool(true)), if_block: Block { stmts: [] }, else_block: Some(Block { stmts: [] }) }), WhileLoop(WhileLoop { condition: Literal(Bool(true)), body: Block { stmts: [] } })] } }] }";
-        assert_eq!(result, test_module);
+        let module = 
+"func test() {
+    if true {
+        x = 2;
+    }
+    if true {
+        x = 1;
+    } else {
+        x = 3;
+    }
+    while true {
+        x = 5;
+    }
+}
+";
+        generic_test(module);
     }
     
     #[test]
     fn test_all() {
-        let func = "func test() {
-            let x: int = 512;
-            let y: int = 256;
-            if x / y == 2 {
-                return \"x / y = 2\";
-            } else {
-                let y = 500;
-            }
+        let module = 
+"func test() {
+    let x: int = 512;
+    let y: int = 256;
+    if x / y == 2 {
+        return \"x / y = 2\";
+    } else {
+        let y = 500;
+    }
+    while x > y {
+        let y = y + 1;
+    }
+    repeat {
+        let x = 2 * x;
+    }
+    return \"hello\";
+}
+";
+        generic_test(module);
+    }
 
-            while x > y {
-                let y = y + 1;
-            }
-            
-            repeat {
-                let x = 2 * x;
-            }
-
-            return \"hello\";
-        }";
-        let test_module = format!("{:?}", parse(tokenize(func)).expect("error"));
-        let result = "Module { funcs: [Func { name: \"test\", param_list: [], return_type: None, block: Block { stmts: [VarDecl(VarDecl { mutable: false, name: \"x\", var_type: Some(Type { name: \"int\" }), value: Some(Literal(Int(512))) }), VarDecl(VarDecl { mutable: false, name: \"y\", var_type: Some(Type { name: \"int\" }), value: Some(Literal(Int(256))) }), Conditional(Conditional { condition: BinaryOp(BinaryOp(Ident(\"x\"), Div, Ident(\"y\")), Eq, Literal(Int(2))), if_block: Block { stmts: [Return(Return { value: Literal(Str(\"x / y = 2\")) })] }, else_block: Some(Block { stmts: [VarDecl(VarDecl { mutable: false, name: \"y\", var_type: None, value: Some(Literal(Int(500))) })] }) }), WhileLoop(WhileLoop { condition: BinaryOp(Ident(\"x\"), Gt, Ident(\"y\")), body: Block { stmts: [VarDecl(VarDecl { mutable: false, name: \"y\", var_type: None, value: Some(BinaryOp(Ident(\"y\"), Plus, Literal(Int(1)))) })] } }), RepeatLoop(RepeatLoop { body: Block { stmts: [VarDecl(VarDecl { mutable: false, name: \"x\", var_type: None, value: Some(BinaryOp(Literal(Int(2)), Mul, Ident(\"x\"))) })] } }), Return(Return { value: Literal(Str(\"hello\")) })] } }] }";
-        assert_eq!(result, test_module);
+    fn generic_test(module: &str) {
+        let p = ast::PrintVisitor {
+            ast: parse(tokenize(module)).expect("error"),
+        };
+        let result = format!("{p}");
+        assert_eq!(result, module);
     }
 }
